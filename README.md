@@ -82,3 +82,9 @@ The FastAPI server exposes the following main endpoint for the dashboard:
    python app.py
    ```
 6. Open your browser and navigate to `http://localhost:5000`
+
+
+## Project View
+<img width="596" height="258" alt="image" src="https://github.com/user-attachments/assets/65468c49-565d-438c-8201-ace9cbc68fd8" />
+<img width="602" height="166" alt="image" src="https://github.com/user-attachments/assets/e658d3a1-672d-4ad1-80fa-a6835940385c" />
+<img width="602" height="324" alt="image" src="https://github.com/user-attachments/assets/d5b29964-99e7-45b4-b0b9-39a5b5d7e94f" />
