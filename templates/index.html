@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Enterprise SCADA Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #14141f;
+            color: #fff;
+            margin: 20px;
+        }
+
+        .top-panel {
+            background: #222233;
+            padding: 15px 25px;
+            display: flex;
+            gap: 20px;
+            align-items: flex-end;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+            flex-wrap: wrap;
+        }
+
+        .input-group label,
+        .slider-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            color: #8a8a9d;
+        }
+
+        input,
+        select,
+        button {
+            padding: 10px;
+            border-radius: 6px;
+            border: 1px solid #3f3f5a;
+            background: #1a1a27;
+            color: #fff;
+        }
+
+        select {
+            width: 150px;
+            cursor: pointer;
+        }
+
+        button {
+            background: #007bff;
+            color: #fff;
+            cursor: pointer;
+            font-weight: bold;
+            border: none;
+            transition: 0.3s;
+            padding: 10px 20px;
+        }
+
+        button:hover {
+            background: #0056b3;
+        }
+
+        #btn_lang {
+            background: #e91e63;
+            margin-left: auto;
+        }
+
+        #btn_lang:hover {
+            background: #c2185b;
+        }
+
+        .slider-group {
+            display: flex;
+            flex-direction: column;
+            width: 170px;
+        }
+
+        input[type="range"] {
+            cursor: pointer;
+            padding: 0;
+            height: 6px;
+        }
+
+        .main-container {
+            display: flex;
+            gap: 20px;
+            height: 380px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-section {
+            width: 25%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .card {
+            background: #222233;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            font-size: 14px;
+            color: #8a8a9d;
+            margin-bottom: 10px;
+        }
+
+        .card-value {
+            font-size: 42px;
+            font-weight: bold;
+        }
+
+        .chart-box {
+            background: #222233;
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        #gaugeChart {
+            width: 30%;
+        }
+
+        #barChart {
+            width: 45%;
+        }
+
+        .financial-container {
+            width: 100%;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="top-panel">
+        <div class="input-group">
+            <label id="lbl_timeRange">بازه زمانی</label>
+            <select id="timeRange">
+                <option value="1" id="opt_day">روز گذشته</option>
+                <option value="7" id="opt_week" selected>هفته گذشته</option>
+                <option value="30" id="opt_month">ماه گذشته</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label id="lbl_target">هدف هر شیفت</label>
+            <input type="number" id="target" value="50000">
+        </div>
+        <div class="input-group">
+            <label id="lbl_price">قیمت واحد (تومان)</label>
+            <input type="number" id="productPrice" value="15000">
+        </div>
+
+        <div class="slider-group">
+            <label>
+                <span id="lbl_kpi">وزن KPI: </span>
+                <span id="kpiLabel" dir="ltr" style="color:#12C2E9; font-weight:bold; display:inline-block;">60%</span>
+            </label>
+            <input type="range" id="kpiWeight" min="0" max="100" value="60">
+        </div>
+        <div class="slider-group">
+            <label>
+                <span id="lbl_achieve">وزن حجم تولید: </span>
+                <span id="achieveLabel" dir="ltr"
+                    style="color:#A8C763; font-weight:bold; display:inline-block;">40%</span>
+            </label>
+            <input type="range" id="achieveWeight" min="0" max="100" value="40">
+        </div>
+
+        <button id="btn_apply" onclick="updateDash()">اعمال تغییرات</button>
+        <button id="btn_lang" onclick="toggleLanguage()">🌐 English</button>
+    </div>
+
+    <div class="main-container">
+        <div class="kpi-section">
+            <div class="card">
+                <div class="card-title" id="lbl_score">نمره کل</div>
+                <div class="card-value" id="kpiScore">--</div>
+            </div>
+        </div>
+        <div id="gaugeChart" class="chart-box"></div>
+        <div id="barChart" class="chart-box"></div>
+    </div>
+    <div class="financial-container chart-box">
+        <div id="financialChart" style="height: 350px; width: 100%;"></div>
+    </div>
+
+    <script>
+        const i18n = {
+            fa: { timeRange: "بازه زمانی", optDay: "روز گذشته", optWeek: "هفته گذشته", optMonth: "ماه گذشته", target: "هدف هر شیفت", price: "قیمت واحد (تومان)", kpi: "وزن KPI: ", achieve: "وزن حجم تولید: ", apply: "اعمال تغییرات", score: "نمره کل", langBtn: "🌐 English", morning: "صبح", evening: "عصر", night: "شب", tooltipShift: "شیفت", tooltipDay: "روز", tooltipUnit: "واحد", tooltipCur: "تومان", gaugeTotal: "هدف تجمیعی:\n", gaugeActual: "تولید واقعی\n", barTitle: "عملکرد شیفت‌ها (هوش مصنوعی متصل است)", finTitle: "روند درآمد", revenue: "درآمد:", totalProd: "تولید کل", by: " به ", anomalyAlert: "⚠️ تولید غیرمعمول (افت شدید)" },
+            en: { timeRange: "Time Range", optDay: "Last Day", optWeek: "Last Week", optMonth: "Last Month", target: "Target Per Shift", price: "Unit Price (Toman)", kpi: "KPI Weight: ", achieve: "Volume Weight: ", apply: "Apply Changes", score: "OVERALL SCORE", langBtn: "🌐 فارسی", morning: "Morning", evening: "Evening", night: "Night", tooltipShift: "Shift", tooltipDay: "Day", tooltipUnit: "Units", tooltipCur: "Toman", gaugeTotal: "Total Target:\n", gaugeActual: "Actual Prod\n", barTitle: "Shift Performance (AI Active)", finTitle: "Revenue Trend", revenue: "Revenue:", totalProd: "Total Prod", by: " by ", anomalyAlert: "⚠️ Anomaly Detected (Low Vol)" }
+        };
+
+        let currentLang = 'fa';
+        function toggleLanguage() {
+            currentLang = currentLang === 'fa' ? 'en' : 'fa';
+            const t = i18n[currentLang];
+            document.getElementById('lbl_timeRange').innerText = t.timeRange; document.getElementById('opt_day').innerText = t.optDay; document.getElementById('opt_week').innerText = t.optWeek; document.getElementById('opt_month').innerText = t.optMonth; document.getElementById('lbl_target').innerText = t.target; document.getElementById('lbl_price').innerText = t.price; document.getElementById('lbl_kpi').innerText = t.kpi; document.getElementById('lbl_achieve').innerText = t.achieve; document.getElementById('btn_apply').innerText = t.apply; document.getElementById('lbl_score').innerText = t.score; document.getElementById('btn_lang').innerText = t.langBtn;
+            updateDash();
+        }
+
+        const kpiSlider = document.getElementById('kpiWeight');
+        const achieveSlider = document.getElementById('achieveWeight');
+        const kpiLabel = document.getElementById('kpiLabel');
+        const achieveLabel = document.getElementById('achieveLabel');
+
+        kpiSlider.addEventListener('input', function () {
+            achieveSlider.value = 100 - this.value;
+            updateLabels();
+        });
+        achieveSlider.addEventListener('input', function () {
+            kpiSlider.value = 100 - this.value;
+            updateLabels();
+        });
+        function updateLabels() {
+            kpiLabel.innerText = kpiSlider.value + '%';
+            achieveLabel.innerText = achieveSlider.value + '%';
+        }
+        const gaugeChart = echarts.init(document.getElementById('gaugeChart'));
+        const barChart = echarts.init(document.getElementById('barChart'));
+        const financialChart = echarts.init(document.getElementById('financialChart'));
+
+        async function updateDash() {
+            const t = i18n[currentLang];
+            const btn = document.getElementById('btn_apply');
+
+            btn.disabled = true;
+            btn.style.opacity = '0.5';
+            btn.innerText = "⏳...";
+
+            const bodyData = {
+                target_production: parseFloat(document.getElementById('target').value),
+                kpi_weight: parseFloat(kpiSlider.value),
+                vol_weight: parseFloat(achieveSlider.value),
+                time_range: document.getElementById('timeRange').value
+            };
+            try {
+                const res = await fetch('/api/calculate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(bodyData)
+                });
+
+                const responseData = await res.json();
+
+                if (responseData.status === "error" || responseData.error) {
+                    alert(responseData.message || "خطا در ارتباط با سرور پردازشی");
+                    return;
+                }
+                const data = responseData.results || [];
+                if (data.length === 0) return;
+
+                let totalProd = 0; let totalScore = 0; const datesSet = new Set();
+                data.forEach(d => { totalProd += d.Actual_Production; totalScore += d.Score; datesSet.add(d.Date); });
+                const avgScore = (totalScore / (data.length || 1)).toFixed(1);
+                const targetProd = parseFloat(bodyData.target_production);
+                const totalTarget = targetProd * (data.length || 1);
+                const dates = Array.from(datesSet).sort();
+
+                const scoreEl = document.getElementById('kpiScore'); scoreEl.innerText = avgScore;
+                scoreEl.style.color = avgScore >= 80 ? '#00E676' : (avgScore >= 50 ? '#FFD54F' : '#FF5252');
+
+                const maxGauge = Math.max(totalTarget * 1.25, totalProd); const targetRatio = totalTarget / maxGauge;
+                gaugeChart.setOption({ series: [{ type: 'gauge', startAngle: 180, endAngle: 0, min: 0, max: maxGauge, splitNumber: 1, axisLine: { lineStyle: { width: 25, color: [[targetRatio, '#12C2E9'], [1, '#A8C763']] } }, pointer: { length: '75%', width: 6, itemStyle: { color: '#8a8a9d' } }, axisTick: { show: false }, splitLine: { show: false }, axisLabel: { show: true, distance: 15, color: '#8a8a9d', formatter: v => (v === 0 ? '0' : (v === maxGauge ? 'Max' : '')) }, title: { offsetCenter: [0, '-40%'], color: '#8a8a9d', fontSize: 14 }, detail: { valueAnimation: true, formatter: v => t.gaugeActual + v.toLocaleString(), color: '#fff', fontSize: 20, offsetCenter: [0, '25%'] }, data: [{ value: totalProd, name: t.gaugeTotal + totalTarget.toLocaleString() }] }] });
+
+                const getBarData = (shiftName, defaultColor) => {
+                    return dates.map(d => {
+                        const r = data.find(x => x.Date === d && x.Shift === shiftName);
+                        if (!r) return { value: 0 };
+                        return { value: r.Score, actual_production: r.Actual_Production, is_anomaly: r.Is_Anomaly, oee: r.OEE, itemStyle: { color: r.Is_Anomaly === 1 ? '#ff1744' : defaultColor } };
+                    });
+                };
+                barChart.setOption({
+                    title: { text: t.barTitle, textStyle: { color: '#8a8a9d', fontSize: 14 } },
+                    tooltip: {
+                        trigger: 'item',
+                        formatter: function (params) {
+
+                            const dateObj = new Date(params.name);
+                            const locale = currentLang === 'en' ? 'en-US' : 'fa-IR';
+                            const dayName = new Intl.DateTimeFormat(locale, { weekday: 'long' }).format(dateObj);
+
+                            let tip = `<b>${params.name} (${dayName}) - ${params.seriesName}</b><br/>`;
+                            tip += `نمره شیفت: ${params.data.value}<br/>`;
+                            tip += `شاخص KPI: ${params.data.oee}%<br/>`;
+                            tip += `تولید: ${params.data.actual_production.toLocaleString()}<br/>`;
+                            if (params.data.is_anomaly === 1) {
+                                tip += `<span style="color:#ff1744; font-weight:bold;">${t.anomalyAlert}</span>`;
+                            }
+                            return tip;
+                        }
+                    },
+                    legend: { data: [t.morning, t.evening, t.night], textStyle: { color: '#fff' }, bottom: 0 },
+                    xAxis: { type: 'category', data: dates, axisLabel: { color: '#8a8a9d' } },
+                    yAxis: { type: 'value', max: 100, splitLine: { lineStyle: { color: '#3f3f5a' } }, axisLabel: { color: '#8a8a9d' } },
+                    series: [
+                        { name: t.morning, type: 'bar', barMinHeight: 5, data: getBarData('Morning', '#00d2ff') },
+                        { name: t.evening, type: 'bar', barMinHeight: 5, data: getBarData('Evening', '#FFD54F') },
+                        { name: t.night, type: 'bar', barMinHeight: 5, data: getBarData('Night', '#9c27b0') }
+                    ]
+                });
+                const timeRangeVal = document.getElementById('timeRange').value; const price = parseFloat(document.getElementById('productPrice').value) || 0; let chartLabels = []; let chartProductions = []; let chartRevenues = []; let tooltipPeriodName = '';
+                if (timeRangeVal === "1") { tooltipPeriodName = t.tooltipShift; chartLabels = [t.morning, t.evening, t.night];['Morning', 'Evening', 'Night'].forEach(shift => { const shiftData = data.filter(d => d.Shift === shift); const sumProd = shiftData.reduce((sum, item) => sum + item.Actual_Production, 0); chartProductions.push(sumProd); chartRevenues.push(sumProd * price); }); } else { tooltipPeriodName = t.tooltipDay; const dailyData = {}; data.forEach(item => { if (!dailyData[item.Date]) dailyData[item.Date] = 0; dailyData[item.Date] += item.Actual_Production; }); chartLabels = Object.keys(dailyData).sort(); chartLabels.forEach(date => { chartProductions.push(dailyData[date]); chartRevenues.push(dailyData[date] * price); }); }
+                financialChart.setOption({ title: { text: `${t.finTitle} (${tooltipPeriodName}${t.by}${tooltipPeriodName})`, textStyle: { color: '#8a8a9d', fontSize: 14 } }, tooltip: { trigger: 'axis', backgroundColor: 'rgba(30,30,45,0.95)', borderColor: '#3f3f5a', textStyle: { color: '#fff' }, formatter: function (params) { const idx = params[0].dataIndex; const val = params[0].value; const prevVal = idx > 0 ? chartRevenues[idx - 1] : val; const diff = val - prevVal; const color = diff >= 0 ? '#00E676' : '#FF5252'; const sign = diff >= 0 ? '▲' : '▼'; const revenueText = (idx > 0) ? `<b style="font-size:16px; color:${color}">${sign} ${val.toLocaleString()} ${t.tooltipCur}</b>` : `<b style="font-size:16px; color:#fff">${val.toLocaleString()} ${t.tooltipCur}</b>`; return `<b>${params[0].name}</b><br/><span style="color:#a8a8b1">${t.totalProd} ${tooltipPeriodName}: ${chartProductions[idx].toLocaleString()} ${t.tooltipUnit}</span><br/><span style="color:#a8a8b1">${t.revenue}</span> ${revenueText}`; } }, xAxis: { type: 'category', data: chartLabels, axisLabel: { color: '#8a8a9d' } }, yAxis: { type: 'value', axisLabel: { color: '#8a8a9d', formatter: value => (value / 1000000) + 'M' }, splitLine: { lineStyle: { color: '#2a2a3c' } } }, series: [{ data: chartRevenues, type: 'line', smooth: false, lineStyle: { color: '#F6A821', width: 3 }, areaStyle: { color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: 'rgba(246,168,33,0.5)' }, { offset: 1, color: 'rgba(246,168,33,0.05)' }]) }, itemStyle: { color: '#F6A821' } }] });
+
+            } catch (error) {
+                console.error("Error:", error);
+            } finally {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                btn.innerText = t.apply;
+            }
+        }
+
+        updateDash();
+        window.addEventListener('resize', () => { gaugeChart.resize(); barChart.resize(); financialChart.resize(); });
+    </script>
+</body>
+
+</html>
